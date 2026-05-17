@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FlowPayDR Owner Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #222;
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .lang-toggle button {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .lang-toggle button.active {
+            background: #007bff;
+            color: #fff;
+            border-color: #007bff;
+        }
+
+        .logout-btn {
+            padding: 6px 12px;
+            background: #d9534f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        #dashboard {
+            margin-top: 20px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            margin-bottom: 12px;
+        }
+
+        input, select, button {
+            font-family: inherit;
+        }
+
+        input[type="text"], input[type="number"], select {
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            min-width: 180px;
+        }
+
+        button {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: none;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+
+        .filter-buttons {
+            margin-bottom: 8px;
+        }
+
+        .filter-buttons button {
+            margin-right: 6px;
+            margin-bottom: 6px;
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .filter-buttons button.active {
+            background: #007bff;
+            color: #fff;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 320px;
+            margin-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .pagination {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .page-info {
+            font-size: 12px;
+            color: #555;
+        }
+
+        .totals-bar {
+            margin: 6px 0 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .flash-green {
+            animation: flashGreen 1.5s ease-out;
+        }
+
+        @keyframes flashGreen {
+            0% { background-color: #d4edda; }
+            100% { background-color: transparent; }
+        }
+
+        @media (max-width: 768px) {
+            table, thead, tbody, th, td, tr {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1 id="title-main">FlowPayDR Owner Dashboard</h1>
+
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div class="lang-toggle">
+                <button id="btn-lang-en" onclick="setLanguage('en')">🇺🇸 EN</button>
+                <button id="btn-lang-es" onclick="setLanguage('es')">🇩🇴 ES</button>
+            </div>
+            <button id="logout-btn" class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div id="dashboard">
+        <!-- BUSINESS CARD -->
+        <div class="card">
+            <h2 id="label-business">Business</h2>
+
+            <!-- Master PIN dropdown (hidden unless PIN = 1234) -->
+            <select id="businessSelector" style="display:none; margin-bottom:10px;"></select>
+            <br>
+
+            <input id="businessKey" placeholder="Enter business key (e.g., colmadojuan)">
+            <button id="btn-load-payments" onclick="loadPayments()">Load Payments</button>
+            <button id="btn-load-payouts" onclick="loadPayoutHistory()">Load Payout History</button>
+        </div>
+
+        <!-- PAYMENTS CARD -->
+        <div class="card">
+            <h2 id="label-payments">Payments</h2>
+
+            <div class="filter-buttons">
+                <button id="btn-today" class="active" onclick="setPaymentFilter('today')">Today</button>
+                <button id="btn-week" onclick="setPaymentFilter('week')">This Week</button>
+                <button id="btn-month" onclick="setPaymentFilter('month')">This Month</button>
+                <button id="btn-all" onclick="setPaymentFilter('all')">All Time</button>
+            </div>
+
+            <div id="paymentTotals" class="totals-bar" style="display:none;"></div>
+
+            <input id="searchInput" type="text" placeholder="Search payments..." class="search-input">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th id="th-invoice">Invoice</th>
+                        <th id="th-customer">Customer</th>
+                        <th id="th-phone">Phone</th>
+                        <th id="th-amount">Amount</th>
+                        <th id="th-date">Date</th>
+                        <th id="th-net">Net</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentsBody">
+                    <tr><td colspan="6">No data</td></tr>
+                </tbody>
+            </table>
+
+            <div id="pagination" class="pagination" style="display:none;">
+                <button onclick="prevPage()">Previous</button>
+                <span id="pageInfo" class="page-info">Page 1 of 1</span>
+                <button onclick="nextPage()">Next</button>
+            </div>
+        </div>
+
+        <!-- PAYOUTS CARD -->
+        <div class="card">
+            <h2 id="label-payouts">Payout History</h2>
+
+            <div class="filter-buttons">
+                <button id="btn-payout-today" onclick="applyFilter('today')">Today</button>
+                <button id="btn-payout-week" onclick="applyFilter('week')">This Week</button>
+                <button id="btn-payout-month" onclick="applyFilter('month')">This Month</button>
+                <button id="btn-payout-all" onclick="applyFilter('all')">All Time</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th id="th-payout-id">ID</th>
+                        <th id="th-payout-amount">Amount</th>
+                        <th id="th-payout-date">Date</th>
+                        <th id="th-payout-status">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="payoutsBody">
+                    <tr><td colspan="4">No payouts found</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        /* =========================
+           LANGUAGE SYSTEM
+        ========================= */
+
+        let lang = localStorage.getItem("language") || "en";
+
+        const text = {
+            en: {
+                title: "FlowPayDR Owner Dashboard",
+                business: "Business",
+                loadPayments: "Load Payments",
+                loadPayouts: "Load Payout History",
+                payments: "Payments",
+                today: "Today",
+                week: "This Week",
+                month: "This Month",
+                all: "All Time",
+                search: "Search payments...",
+                invoice: "Invoice",
+                customer: "Customer",
+                phone: "Phone",
+                amount: "Amount",
+                date: "Date",
+                net: "Net",
+                payouts: "Payout History",
+                id: "ID",
+                status: "Status",
+                completed: "Completed",
+                logout: "Logout",
+                gross: "Gross",
+                fees: "Fees",
+                noData: "No data",
+                noPayouts: "No payouts found",
+                enterBusinessKey: "Enter a business key"
+            },
+            es: {
+                title: "FlowPayDR Panel de Dueños",
+                business: "Negocio",
+                loadPayments: "Cargar Pagos",
+                loadPayouts: "Cargar Historial",
+                payments: "Pagos",
+                today: "Hoy",
+                week: "Esta Semana",
+                month: "Este Mes",
+                all: "Todo el Tiempo",
+                search: "Buscar pagos...",
+                invoice: "Factura",
+                customer: "Cliente",
+                phone: "Teléfono",
+                amount: "Monto",
+                date: "Fecha",
+                net: "Neto",
+                payouts: "Historial de Payouts",
+                id: "ID",
+                status: "Estado",
+                completed: "Completado",
+                logout: "Cerrar Sesión",
+                gross: "Bruto",
+                fees: "Cargos",
+                noData: "Sin datos",
+                noPayouts: "No se encontraron payouts",
+                enterBusinessKey: "Ingrese una clave de negocio"
+            }
+        };
+
+        function setLanguage(l) {
+            lang = l;
+            localStorage.setItem("language", l);
+            applyLanguage();
+        }
+
+        function applyLanguage() {
+            const t = text[lang];
+
+            document.getElementById("title-main").innerText = t.title;
+            document.getElementById("label-business").innerText = t.business;
+            document.getElementById("btn-load-payments").innerText = t.loadPayments;
+            document.getElementById("btn-load-payouts").innerText = t.loadPayouts;
+
+            document.getElementById("label-payments").innerText = t.payments;
+            document.getElementById("btn-today").innerText = t.today;
+            document.getElementById("btn-week").innerText = t.week;
+            document.getElementById("btn-month").innerText = t.month;
+            document.getElementById("btn-all").innerText = t.all;
+
+            document.getElementById("searchInput").placeholder = t.search;
+
+            document.getElementById("th-invoice").innerText = t.invoice;
+            document.getElementById("th-customer").innerText = t.customer;
+            document.getElementById("th-phone").innerText = t.phone;
+            document.getElementById("th-amount").innerText = t.amount;
+            document.getElementById("th-date").innerText = t.date;
+            document.getElementById("th-net").innerText = t.net;
+
+            document.getElementById("label-payouts").innerText = t.payouts;
+            document.getElementById("btn-payout-today").innerText = t.today;
+            document.getElementById("btn-payout-week").innerText = t.week;
+            document.getElementById("btn-payout-month").innerText = t.month;
+            document.getElementById("btn-payout-all").innerText = t.all;
+
+            document.getElementById("th-payout-id").innerText = t.id;
+            document.getElementById("th-payout-amount").innerText = t.amount;
+            document.getElementById("th-payout-date").innerText = t.date;
+            document.getElementById("th-payout-status").innerText = t.status;
+
+            document.getElementById("logout-btn").innerText = t.logout;
+
+            // Language toggle button styles
+            document.getElementById("btn-lang-en").classList.toggle("active", lang === "en");
+            document.getElementById("btn-lang-es").classList.toggle("active", lang === "es");
+        }
+
+        /* =========================
+           AUTH / LOCALSTORAGE
+        ========================= */
+
+        const API_BASE = "https://stripe-whatsapp-webhook-fixed-new.vercel.app/api/owner";
+        const MASTER_PIN = "1234";
+
+        let allPayments = [];
+        let filteredPayments = [];
+        let currentPage = 1;
+        const pageSize = 20;
+
+        let allPayouts = [];
+        let paymentFilter = "today";
+        let lastSeenCreated = null;
+
+        const token = localStorage.getItem("flowpay_token");
+        const businessKeyLS = localStorage.getItem("flowpay_businessKey");
+        const ownerPhone = localStorage.getItem("flowpay_ownerPhone");
+        const savedPIN = localStorage.getItem("pin");
+
+        if (!token || !businessKeyLS || !ownerPhone) {
+            window.location.href = "login.html";
+        }
+
+        /* =========================
+           MASTER PIN DROPDOWN
+        ========================= */
+
+        window.addEventListener("DOMContentLoaded", async () => {
+            applyLanguage();
+
+            const businessInput = document.getElementById("businessKey");
+            const dropdown = document.getElementById("businessSelector");
+
+            if (businessInput && businessKeyLS) {
+                businessInput.value = businessKeyLS;
+            }
+
+            // Master PIN mode
+            if (savedPIN === MASTER_PIN) {
+                dropdown.style.display = "inline-block";
+
+                try {
+                    const res = await fetch("/businesses.json");
+                    const businesses = await res.json();
+
+                    dropdown.innerHTML = `<option value="">-- select business --</option>`;
+
+                    Object.keys(businesses).forEach(key => {
+                        dropdown.innerHTML += `<option value="${key}">${key}</option>`;
+                    });
+
+                    dropdown.addEventListener("change", () => {
+                        if (dropdown.value) {
+                            businessInput.value = dropdown.value;
+                            loadPayments();
+                            loadPayoutHistory();
+                        }
+                    });
+
+                } catch (err) {
+                    console.error("Error loading businesses.json", err);
+                }
+            }
+
+            // Initial load for logged-in business
+            if (businessInput && businessInput.value.trim() !== "") {
+                loadPayments();
+                loadPayoutHistory();
+            }
+        });
+
+        /* =========================
+           LOGOUT
+        ========================= */
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = "login.html";
+        }
+
+        /* =========================
+           LOAD PAYMENTS
+        ========================= */
+
+        async function loadPayments(silent = false) {
+            const businessKey = document.getElementById("businessKey").value.trim();
+            if (!businessKey) {
+                alert(text[lang].enterBusinessKey);
+                return;
+            }
+
+            if (!silent) {
+                document.getElementById("paymentsBody").innerHTML =
+                    `<tr><td colspan="6">${text[lang].noData}</td></tr>`;
+            }
+
+            try {
+                const res = await fetch(
+                    `${API_BASE}?action=payments&businessKey=${encodeURIComponent(
+                        businessKey
+                    )}&pin=${encodeURIComponent(token)}&phone=${encodeURIComponent(ownerPhone)}`
+                );
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Unauthorized");
+
+                allPayments = data.payments || [];
+                applyPaymentFilter();
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById("paymentsBody").innerHTML =
+                    `<tr><td colspan="6">Error loading payments</td></tr>`;
+                updatePaymentTotals([]);
+            }
+        }
+
+        /* AUTO REFRESH — only when filter = today AND no search */
+        setInterval(async () => {
+            const businessKey = document.getElementById("businessKey").value.trim();
+            const searchValue = document.getElementById("searchInput").value.trim();
+
+            if (businessKey && paymentFilter === "today" && searchValue === "") {
+                await loadPayments(true);
+            }
+        }, 5000);
+
+        /* =========================
+           PAYOUT HISTORY
+        ========================= */
+
+        async function loadPayoutHistory() {
+            const businessKey = document.getElementById("businessKey").value.trim();
+            if (!businessKey) {
+                alert(text[lang].enterBusinessKey);
+                return;
+            }
+
+            document.getElementById("payoutsBody").innerHTML =
+                `<tr><td colspan="4">Loading...</td></tr>`;
+
+            try {
+                const res = await fetch(
+                    `${API_BASE}?action=payouts&businessKey=${encodeURIComponent(
+                        businessKey
+                    )}&pin=${encodeURIComponent(token)}&phone=${encodeURIComponent(ownerPhone)}`
+                );
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Unauthorized");
+
+                allPayouts = data.payouts || [];
+                renderPayouts(allPayouts);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById("payoutsBody").innerHTML =
+                    `<tr><td colspan="4">Error loading payouts</td></tr>`;
+            }
+        }
+
+        /* =========================
+           PAYMENT FILTERS / SEARCH
+        ========================= */
+
+        function setPaymentFilter(type) {
+            paymentFilter = type;
+
+            document.getElementById("btn-today").classList.toggle("active", type === "today");
+            document.getElementById("btn-week").classList.toggle("active", type === "week");
+            document.getElementById("btn-month").classList.toggle("active", type === "month");
+            document.getElementById("btn-all").classList.toggle("active", type === "all");
+
+            applyPaymentFilter();
+        }
+
+        function applyPaymentFilter() {
+            const now = new Date();
+
+            filteredPayments = allPayments.filter(p => {
+                const d = new Date(p.created);
+
+                if (paymentFilter === "today") {
+                    return d.toDateString() === now.toDateString();
+                }
+                if (paymentFilter === "week") {
+                    const day = now.getDay();
+                    const monday = new Date(now);
+                    monday.setDate(now.getDate() - ((day + 6) % 7));
+                    return d >= monday && d <= now;
+                }
+                if (paymentFilter === "month") {
+                    return (
+                        d.getMonth() === now.getMonth() &&
+                        d.getFullYear() === now.getFullYear()
+                    );
+                }
+                return true;
+            });
+
+            currentPage = 1;
+            renderPaymentsPage();
+        }
+
+        document.getElementById("searchInput").addEventListener("input", function () {
+            const query = this.value.toLowerCase();
+
+            if (query.trim() === "") {
+                applyPaymentFilter();
+                return;
+            }
+
+            filteredPayments = allPayments.filter(p =>
+                p.invoice.toString().includes(query) ||
+                (p.customer_name || "").toLowerCase().includes(query) ||
+                (p.customer_phone || "").toString().includes(query) ||
+                p.amount.toString().includes(query) ||
+                new Date(p.created).toLocaleString().toLowerCase().includes(query)
+            );
+
+            document.getElementById("pagination").style.display = "none";
+            renderPaymentsPage();
+        });
+
+        /* =========================
+           PAYMENT TOTALS
+        ========================= */
+
+        function updatePaymentTotals(list) {
+            const bar = document.getElementById("paymentTotals");
+            const t = text[lang];
+
+            if (!list || list.length === 0) {
+                bar.style.display = "none";
+                bar.innerHTML = "";
+                return;
+            }
+
+            let gross = 0;
+            let net = 0;
+            let fees = 0;
+
+            list.forEach(p => {
+                const amount = Number(p.amount) || 0;
+                const netAmount = Number(p.net_amount) || 0;
+                const stripeFee = Number(p.stripe_fee_dop || 0);
+                const platformFee = Number(p.platform_fee || 0);
+
+                gross += amount;
+                net += netAmount;
+                fees += stripeFee + platformFee;
+            });
+
+            bar.style.display = "block";
+            bar.innerHTML = `
+                ${t.gross}: RD$ ${gross.toFixed(2)} |
+                ${t.net}: RD$ ${net.toFixed(2)} |
+                ${t.fees}: RD$ ${fees.toFixed(2)}
+            `;
+        }
+
+        /* =========================
+           PAYMENT TABLE + PAGINATION
+        ========================= */
+
+        function renderPaymentsPage() {
+            const t = text[lang];
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+
+            const pageItems = filteredPayments.slice(start, end);
+
+            if (pageItems.length === 0) {
+                document.getElementById("paymentsBody").innerHTML =
+                    `<tr><td colspan="6">${t.noData}</td></tr>`;
+                updatePaymentTotals([]);
+                return;
+            }
+
+            let html = "";
+
+            pageItems.forEach(p => {
+                const createdTime = Number(p.created) || 0;
+                const isNew =
+                    lastSeenCreated !== null && createdTime > lastSeenCreated;
+
+                html += `
+                    <tr class="${isNew ? "flash-green" : ""}">
+                        <td>${p.invoice}</td>
+                        <td>${p.customer_name || ""}</td>
+                        <td>${p.customer_phone || ""}</td>
+                        <td>${p.amount} ${String(p.currency || "DOP").toUpperCase()}</td>
+                        <td>${new Date(p.created).toLocaleString()}</td>
+                        <td>${(p.net_amount || 0).toFixed(2)} DOP</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById("paymentsBody").innerHTML = html;
+
+            if (filteredPayments.length > 0) {
+                const maxCreated = Math.max(
+                    ...filteredPayments.map(p => Number(p.created) || 0)
+                );
+                lastSeenCreated = maxCreated;
+            }
+
+            updatePaymentTotals(filteredPayments);
+
+            const totalPages = Math.ceil(filteredPayments.length / pageSize);
+            document.getElementById("pageInfo").innerText =
+                `Page ${currentPage} of ${totalPages}`;
+            document.getElementById("pagination").style.display =
+                totalPages > 1 ? "block" : "none";
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredPayments.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderPaymentsPage();
+            }
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPaymentsPage();
+            }
+        }
+
+        /* =========================
+           PAYOUT HISTORY
+        ========================= */
+
+        function applyFilter(type) {
+            const now = new Date();
+            let filtered = allPayouts;
+
+            if (type === "today") {
+                filtered = allPayouts.filter(p => {
+                    const d = new Date(p.timestamp);
+                    return d.toDateString() === now.toDateString();
+                });
+            }
+
+            if (type === "week") {
+                const day = now.getDay();
+                const monday = new Date(now);
+                monday.setDate(now.getDate() - ((day + 6) % 7));
+
+                filtered = allPayouts.filter(p => {
+                    const d = new Date(p.timestamp);
+                    return d >= monday && d <= now;
+                });
+            }
+
+            if (type === "month") {
+                const month = now.getMonth();
+                const year = now.getFullYear();
+
+                filtered = allPayouts.filter(p => {
+                    const d = new Date(p.timestamp);
+                    return d.getMonth() === month && d.getFullYear() === year;
+                });
+            }
+
+            renderPayouts(filtered);
+        }
+
+        function renderPayouts(list) {
+            const t = text[lang];
+
+            if (!list || list.length === 0) {
+                document.getElementById("payoutsBody").innerHTML =
+                    `<tr><td colspan="4">${t.noPayouts}</td></tr>`;
+                return;
+            }
+
+            let totalGross = 0;
+            let totalNet = 0;
+            let totalStripe = 0;
+            let totalPlatform = 0;
+
+            list.forEach(p => {
+                totalGross += p.totalGross || 0;
+                totalNet += p.totalNet || 0;
+                totalStripe += p.totalStripeFees || 0;
+                totalPlatform += p.totalPlatformFees || 0;
+            });
+
+            let html = `
+                <tr style="background:#fafafa; font-weight:bold;">
+                    <td colspan="4">
+                        <div>💰 ${t.gross}: RD$ ${totalGross.toFixed(2)}</div>
+                        <div>💳 Stripe Fees: RD$ ${totalStripe.toFixed(2)}</div>
+                        <div>🏷️ ${t.fees}: RD$ ${totalPlatform.toFixed(2)}</div>
+                        <div>🟢 ${t.net}: RD$ ${totalNet.toFixed(2)}</div>
+                    </td>
+                </tr>
+            `;
+
+            list.forEach(p => {
+                const date = new Date(p.timestamp).toLocaleString();
+
+                html += `
+                    <tr onclick="togglePayoutDetails('${p.id}')" style="cursor:pointer;">
+                        <td>${p.id}</td>
+                        <td>${p.totalNet.toFixed(2)} DOP</td>
+                        <td>${date}</td>
+                        <td>${t.completed}</td>
+                    </tr>
+
+                    <tr id="details-${p.id}" style="display:none; background:#f9f9f9;">
+                        <td colspan="4">
+                            <strong>Included Invoices:</strong><br>
+                            ${p.includedInvoices.map(i => `🧾 ${i}`).join("<br>")}
+                            <br><br>
+                            <strong>${t.gross}:</strong> RD$ ${p.totalGross.toFixed(2)}<br>
+                            <strong>Stripe Fees:</strong> RD$ ${p.totalStripeFees.toFixed(2)}<br>
+                            <strong>${t.fees}:</strong> RD$ ${p.totalPlatformFees.toFixed(2)}<br>
+                            <strong>${t.net}:</strong> RD$ ${p.totalNet.toFixed(2)}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById("payoutsBody").innerHTML = html;
+        }
+
+        function togglePayoutDetails(id) {
+            const row = document.getElementById(`details-${id}`);
+            if (!row) return;
+            row.style.display = row.style.display === "none" ? "table-row" : "none";
+        }
+    </script>
+</body>
+</html>
