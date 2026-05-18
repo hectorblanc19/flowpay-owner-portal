@@ -1,25 +1,40 @@
-// Install immediately
+const CACHE_NAME = "flowpay-v5";
+
+// Install new SW immediately
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
-// Activate immediately
-self.addEventListener("activate", () => {
-  // No clientsClaim() — it breaks on Edge
+// Activate new SW and delete old caches
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(k => k !== CACHE_NAME)
+          .map(k => caches.delete(k))
+      )
+    )
+  );
 });
 
-// Only cache static assets (NO HTML)
+// Cache ONLY static assets (JS, CSS, images)
 self.addEventListener("fetch", (event) => {
   const req = event.request;
 
-  // Cache only images, scripts, styles
+  // Never cache HTML — always fetch fresh
+  if (req.destination === "document") {
+    return;
+  }
+
+  // Cache JS, CSS, images
   if (
-    req.destination === "image" ||
     req.destination === "script" ||
-    req.destination === "style"
+    req.destination === "style" ||
+    req.destination === "image"
   ) {
     event.respondWith(
-      caches.open("flowpay-cache").then(cache =>
+      caches.open(CACHE_NAME).then(cache =>
         cache.match(req).then(res => {
           return (
             res ||

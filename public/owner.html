@@ -399,52 +399,52 @@
         }
 
         /* =========================
-           MASTER PIN DROPDOWN
-        ========================= */
+   MASTER PIN DROPDOWN
+========================= */
 
-        window.addEventListener("DOMContentLoaded", async () => {
-            applyLanguage();
+window.addEventListener("DOMContentLoaded", async () => {
+    applyLanguage();
 
-            const businessInput = document.getElementById("businessKey");
-            const dropdown = document.getElementById("businessSelector");
+    const businessInput = document.getElementById("businessKey");
+    const dropdown = document.getElementById("businessSelector");
 
-            if (businessInput && businessKeyLS) {
-                businessInput.value = businessKeyLS;
-            }
+    if (businessInput && businessKeyLS) {
+        businessInput.value = businessKeyLS;
+    }
 
-            // Master PIN mode
-            if (savedPIN === MASTER_PIN) {
-                dropdown.style.display = "inline-block";
+    // Master PIN mode (load ALL KV businesses)
+    if (savedPIN === MASTER_PIN) {
+        dropdown.style.display = "inline-block";
 
-                try {
-                    const res = await fetch("/businesses.json");
-                    const businesses = await res.json();
+        try {
+            const res = await fetch("https://stripe-whatsapp-webhook-fixed-new.vercel.app/api/owner/businesses?pin=1234");
+            const businesses = await res.json();
 
-                    dropdown.innerHTML = `<option value="">-- select business --</option>`;
+            dropdown.innerHTML = `<option value="">-- select business --</option>`;
 
-                    Object.keys(businesses).forEach(key => {
-                        dropdown.innerHTML += `<option value="${key}">${key}</option>`;
-                    });
+            businesses.forEach(b => {
+                dropdown.innerHTML += `<option value="${b.key}">${b.key}</option>`;
+            });
 
-                    dropdown.addEventListener("change", () => {
-                        if (dropdown.value) {
-                            businessInput.value = dropdown.value;
-                            loadPayments();
-                            loadPayoutHistory();
-                        }
-                    });
-
-                } catch (err) {
-                    console.error("Error loading businesses.json", err);
+            dropdown.addEventListener("change", () => {
+                if (dropdown.value) {
+                    businessInput.value = dropdown.value;
+                    loadPayments();
+                    loadPayoutHistory();
                 }
-            }
+            });
 
-            // Initial load for logged-in business
-            if (businessInput && businessInput.value.trim() !== "") {
-                loadPayments();
-                loadPayoutHistory();
-            }
-        });
+        } catch (err) {
+            console.error("Error loading KV businesses", err);
+        }
+    }
+
+    // Initial load for logged-in business
+    if (businessInput && businessInput.value.trim() !== "") {
+        loadPayments();
+        loadPayoutHistory();
+    }
+});
 
         /* =========================
            LOGOUT
