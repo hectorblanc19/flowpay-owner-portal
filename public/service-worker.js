@@ -1,48 +1,38 @@
-const CACHE_NAME = "flowpay-v5";
+const CACHE_NAME = "flowpay-mobile-v1";
 
-// Install new SW immediately
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// Activate new SW and delete old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(k => k !== CACHE_NAME)
-          .map(k => caches.delete(k))
-      )
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     )
   );
+  self.clients.claim();
 });
 
-// Cache ONLY static assets (JS, CSS, images)
+// Safe fetch handler — caches ONLY static assets
 self.addEventListener("fetch", (event) => {
   const req = event.request;
 
-  // Never cache HTML — always fetch fresh
-  if (req.destination === "document") {
+  // Never cache HTML or API calls
+  if (req.mode === "navigate" || req.url.includes("/api/")) {
     return;
   }
 
-  // Cache JS, CSS, images
-  if (
-    req.destination === "script" ||
-    req.destination === "style" ||
-    req.destination === "image"
-  ) {
+  // Cache static assets only
+  if (req.destination === "script" || req.destination === "style" || req.destination === "image") {
     event.respondWith(
       caches.open(CACHE_NAME).then(cache =>
-        cache.match(req).then(res => {
-          return (
-            res ||
-            fetch(req).then(fetchRes => {
-              cache.put(req, fetchRes.clone());
-              return fetchRes;
-            })
-          );
+        cache.match(req).then(cached => {
+          if (cached) return cached;
+
+          return fetch(req).then(networkRes => {
+            cache.put(req, networkRes.clone());
+            return networkRes;
+          });
         })
       )
     );
