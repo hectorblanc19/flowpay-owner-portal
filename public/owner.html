@@ -557,67 +557,82 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         /* =========================
-           PAYMENT FILTERS / SEARCH
-        ========================= */
+   PAYMENT FILTERS / SEARCH
+========================= */
 
-        function setPaymentFilter(type) {
-            paymentFilter = type;
+function setPaymentFilter(type) {
+    paymentFilter = type;
 
-            document.getElementById("btn-today").classList.toggle("active", type === "today");
-            document.getElementById("btn-week").classList.toggle("active", type === "week");
-            document.getElementById("btn-month").classList.toggle("active", type === "month");
-            document.getElementById("btn-all").classList.toggle("active", type === "all");
+    document.getElementById("btn-today").classList.toggle("active", type === "today");
+    document.getElementById("btn-week").classList.toggle("active", type === "week");
+    document.getElementById("btn-month").classList.toggle("active", type === "month");
+    document.getElementById("btn-all").classList.toggle("active", type === "all");
 
-            applyPaymentFilter();
+    applyPaymentFilter();
+}
+
+function applyPaymentFilter() {
+    const now = new Date();
+
+    filteredPayments = allPayments.filter(p => {
+        const d = new Date(p.created);
+
+        // ⭐ TODAY (works fine)
+        if (paymentFilter === "today") {
+            return d.toDateString() === now.toDateString();
         }
 
-        function applyPaymentFilter() {
-            const now = new Date();
+        // ⭐ FIXED WEEK FILTER (timezone‑safe)
+        if (paymentFilter === "week") {
+            // Normalize both dates to local midnight
+            const localNow = new Date();
+            localNow.setHours(0, 0, 0, 0);
 
-            filteredPayments = allPayments.filter(p => {
-                const d = new Date(p.created);
+            const dLocal = new Date(d);
+            dLocal.setHours(0, 0, 0, 0);
 
-                if (paymentFilter === "today") {
-                    return d.toDateString() === now.toDateString();
-                }
-                if (paymentFilter === "week") {
-                    const day = now.getDay();
-                    const monday = new Date(now);
-                    monday.setDate(now.getDate() - ((day + 6) % 7));
-                    return d >= monday && d <= now;
-                }
-                if (paymentFilter === "month") {
-                    return (
-                        d.getMonth() === now.getMonth() &&
-                        d.getFullYear() === now.getFullYear()
-                    );
-                }
-                return true;
-            });
+            // Monday = start of week
+            const day = localNow.getDay(); // 0=Sun, 1=Mon...
+            const monday = new Date(localNow);
+            monday.setDate(localNow.getDate() - ((day + 6) % 7));
 
-            currentPage = 1;
-            renderPaymentsPage();
+            return dLocal >= monday && dLocal <= localNow;
         }
 
-        document.getElementById("searchInput").addEventListener("input", function () {
-            const query = this.value.toLowerCase();
-
-            if (query.trim() === "") {
-                applyPaymentFilter();
-                return;
-            }
-
-            filteredPayments = allPayments.filter(p =>
-                p.invoice.toString().includes(query) ||
-                (p.customer_name || "").toLowerCase().includes(query) ||
-                (p.customer_phone || "").toString().includes(query) ||
-                p.amount.toString().includes(query) ||
-                new Date(p.created).toLocaleString().toLowerCase().includes(query)
+        // ⭐ MONTH (safe)
+        if (paymentFilter === "month") {
+            return (
+                d.getMonth() === now.getMonth() &&
+                d.getFullYear() === now.getFullYear()
             );
+        }
 
-            document.getElementById("pagination").style.display = "none";
-            renderPaymentsPage();
-        });
+        return true;
+    });
+
+    currentPage = 1;
+    renderPaymentsPage();
+}
+
+document.getElementById("searchInput").addEventListener("input", function () {
+    const query = this.value.toLowerCase();
+
+    if (query.trim() === "") {
+        applyPaymentFilter();
+        return;
+    }
+
+    filteredPayments = allPayments.filter(p =>
+        p.invoice.toString().includes(query) ||
+        (p.customer_name || "").toLowerCase().includes(query) ||
+        (p.customer_phone || "").toString().includes(query) ||
+        p.amount.toString().includes(query) ||
+        new Date(p.created).toLocaleString().toLowerCase().includes(query)
+    );
+
+    document.getElementById("pagination").style.display = "none";
+    renderPaymentsPage();
+});
 
         /* =========================
    PAYMENT TOTALS (UPDATED)
