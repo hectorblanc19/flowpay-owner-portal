@@ -225,23 +225,26 @@
 
             <div id="paymentTotals" class="totals-bar" style="display:none;"></div>
 
-            <input id="searchInput" type="text" placeholder="Search payments..." class="search-input">
+<input id="searchInput" type="text" placeholder="Search payments..." class="search-input">
 
-            <table>
-                <thead>
-                    <tr>
-                        <th id="th-invoice">Invoice</th>
-                        <th id="th-customer">Customer</th>
-                        <th id="th-phone">Phone</th>
-                        <th id="th-amount">Amount</th>
-                        <th id="th-date">Date</th>
-                        <th id="th-net">Net</th>
-                    </tr>
-                </thead>
-                <tbody id="paymentsBody">
-                    <tr><td colspan="6">No data</td></tr>
-                </tbody>
-            </table>
+<table>
+    <thead>
+        <tr>
+            <th id="th-invoice">Invoice</th>
+            <th id="th-customer">Customer</th>
+            <th id="th-phone">Phone</th>
+            <th id="th-amount">Amount</th>
+            <th id="th-date">Date</th>
+            <th id="th-stripe">Stripe Fee</th>
+            <th id="th-platform">Platform Fee</th>
+            <th id="th-net">Net</th>
+        </tr>
+    </thead>
+
+    <tbody id="paymentsBody">
+        <tr><td colspan="8">No data</td></tr>
+    </tbody>
+</table>
 
             <div id="pagination" class="pagination" style="display:none;">
                 <button onclick="prevPage()">Previous</button>
@@ -617,96 +620,120 @@ window.addEventListener("DOMContentLoaded", async () => {
         });
 
         /* =========================
-           PAYMENT TOTALS
-        ========================= */
+   PAYMENT TOTALS (UPDATED)
+========================= */
 
-        function updatePaymentTotals(list) {
-            const bar = document.getElementById("paymentTotals");
-            const t = text[lang];
+function updatePaymentTotals(list) {
+    const bar = document.getElementById("paymentTotals");
+    const t = text[lang];
 
-            if (!list || list.length === 0) {
-                bar.style.display = "none";
-                bar.innerHTML = "";
-                return;
-            }
+    if (!list || list.length === 0) {
+        bar.style.display = "none";
+        bar.innerHTML = "";
+        return;
+    }
 
-            let gross = 0;
-            let net = 0;
-            let fees = 0;
+    let gross = 0;
+    let net = 0;
+    let stripeTotal = 0;
+    let platformTotal = 0;
 
-            list.forEach(p => {
-                const amount = Number(p.amount) || 0;
-                const netAmount = Number(p.net_amount) || 0;
-                const stripeFee = Number(p.stripe_fee_dop || 0);
-                const platformFee = Number(p.platform_fee || 0);
+    list.forEach(p => {
+        const amount = Number(p.amount) || 0;
+        const netAmount = Number(p.net_amount) || 0;
 
-                gross += amount;
-                net += netAmount;
-                fees += stripeFee + platformFee;
-            });
+        const stripeFee =
+            p.currency.toLowerCase() === "usd"
+                ? Number(p.stripe_fee_usd || 0)
+                : Number(p.stripe_fee_dop || 0);
 
-            bar.style.display = "block";
-            bar.innerHTML = `
-                ${t.gross}: RD$ ${gross.toFixed(2)} |
-                ${t.net}: RD$ ${net.toFixed(2)} |
-                ${t.fees}: RD$ ${fees.toFixed(2)}
-            `;
-        }
+        const platformFee = Number(p.platform_fee) || 0;
 
-        /* =========================
-           PAYMENT TABLE + PAGINATION
-        ========================= */
+        gross += amount;
+        net += netAmount;
+        stripeTotal += stripeFee;
+        platformTotal += platformFee;
+    });
 
-        function renderPaymentsPage() {
-            const t = text[lang];
-            const start = (currentPage - 1) * pageSize;
-            const end = start + pageSize;
+    const currency = (list[0]?.currency || "DOP").toUpperCase();
 
-            const pageItems = filteredPayments.slice(start, end);
+    bar.style.display = "block";
+    bar.innerHTML = `
+        ${t.gross}: ${currency} ${gross.toFixed(2)} |
+        Stripe: ${currency} ${stripeTotal.toFixed(2)} |
+        Platform: ${currency} ${platformTotal.toFixed(2)} |
+        ${t.fees}: ${currency} ${(stripeTotal + platformTotal).toFixed(2)} |
+        ${t.net}: ${currency} ${net.toFixed(2)}
+    `;
+}
 
-            if (pageItems.length === 0) {
-                document.getElementById("paymentsBody").innerHTML =
-                    `<tr><td colspan="6">${t.noData}</td></tr>`;
-                updatePaymentTotals([]);
-                return;
-            }
+/* =========================
+   PAYMENT TABLE + PAGINATION (UPDATED)
+========================= */
 
-            let html = "";
+function renderPaymentsPage() {
+    const t = text[lang];
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
 
-            pageItems.forEach(p => {
-                const createdTime = Number(p.created) || 0;
-                const isNew =
-                    lastSeenCreated !== null && createdTime > lastSeenCreated;
+    const pageItems = filteredPayments.slice(start, end);
 
-                html += `
-                    <tr class="${isNew ? "flash-green" : ""}">
-                        <td>${p.invoice}</td>
-                        <td>${p.customer_name || ""}</td>
-                        <td>${p.customer_phone || ""}</td>
-                        <td>${p.amount} ${String(p.currency || "DOP").toUpperCase()}</td>
-                        <td>${new Date(p.created).toLocaleString()}</td>
-                        <td>${(p.net_amount || 0).toFixed(2)} DOP</td>
-                    </tr>
-                `;
-            });
+    if (pageItems.length === 0) {
+        document.getElementById("paymentsBody").innerHTML =
+            `<tr><td colspan="8">${t.noData}</td></tr>`;
+        updatePaymentTotals([]);
+        return;
+    }
 
-            document.getElementById("paymentsBody").innerHTML = html;
+    let html = "";
 
-            if (filteredPayments.length > 0) {
-                const maxCreated = Math.max(
-                    ...filteredPayments.map(p => Number(p.created) || 0)
-                );
-                lastSeenCreated = maxCreated;
-            }
+    pageItems.forEach(p => {
+        const createdTime = Number(p.created) || 0;
+        const isNew =
+            lastSeenCreated !== null && createdTime > lastSeenCreated;
 
-            updatePaymentTotals(filteredPayments);
+        const currency = (p.currency || "DOP").toUpperCase();
 
-            const totalPages = Math.ceil(filteredPayments.length / pageSize);
-            document.getElementById("pageInfo").innerText =
-                `Page ${currentPage} of ${totalPages}`;
-            document.getElementById("pagination").style.display =
-                totalPages > 1 ? "block" : "none";
-        }
+        // ⭐ Correct Stripe Fee logic (USD vs DOP)
+        const stripeFee =
+            p.currency.toLowerCase() === "usd"
+                ? (p.stripe_fee_usd || 0)
+                : (p.stripe_fee_dop || 0);
+
+        html += `
+            <tr class="${isNew ? "flash-green" : ""}">
+                <td>${p.invoice}</td>
+                <td>${p.customer_name || ""}</td>
+                <td>${p.customer_phone || ""}</td>
+                <td>${p.amount.toFixed(2)} ${currency}</td>
+                <td>${new Date(p.created).toLocaleString()}</td>
+
+                <!-- ⭐ NEW COLUMNS -->
+                <td>${stripeFee.toFixed(2)} ${currency}</td>
+                <td>${p.platform_fee.toFixed(2)} ${currency}</td>
+
+                <td>${p.net_amount.toFixed(2)} ${currency}</td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("paymentsBody").innerHTML = html;
+
+    if (filteredPayments.length > 0) {
+        const maxCreated = Math.max(
+            ...filteredPayments.map(p => Number(p.created) || 0)
+        );
+        lastSeenCreated = maxCreated;
+    }
+
+    updatePaymentTotals(filteredPayments);
+
+    const totalPages = Math.ceil(filteredPayments.length / pageSize);
+    document.getElementById("pageInfo").innerText =
+        `Page ${currentPage} of ${totalPages}`;
+    document.getElementById("pagination").style.display =
+        totalPages > 1 ? "block" : "none";
+}
 
         function nextPage() {
             const totalPages = Math.ceil(filteredPayments.length / pageSize);
@@ -724,109 +751,114 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         /* =========================
-           PAYOUT HISTORY
-        ========================= */
+       PAYOUT HISTORY (USD/DOP FIXED)
+========================= */
 
-        function applyFilter(type) {
-            const now = new Date();
-            let filtered = allPayouts;
+function applyFilter(type) {
+    const now = new Date();
+    let filtered = allPayouts;
 
-            if (type === "today") {
-                filtered = allPayouts.filter(p => {
-                    const d = new Date(p.timestamp);
-                    return d.toDateString() === now.toDateString();
-                });
-            }
+    if (type === "today") {
+        filtered = allPayouts.filter(p => {
+            const d = new Date(p.timestamp);
+            return d.toDateString() === now.toDateString();
+        });
+    }
 
-            if (type === "week") {
-                const day = now.getDay();
-                const monday = new Date(now);
-                monday.setDate(now.getDate() - ((day + 6) % 7));
+    if (type === "week") {
+        const day = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - ((day + 6) % 7));
 
-                filtered = allPayouts.filter(p => {
-                    const d = new Date(p.timestamp);
-                    return d >= monday && d <= now;
-                });
-            }
+        filtered = allPayouts.filter(p => {
+            const d = new Date(p.timestamp);
+            return d >= monday && d <= now;
+        });
+    }
 
-            if (type === "month") {
-                const month = now.getMonth();
-                const year = now.getFullYear();
+    if (type === "month") {
+        const month = now.getMonth();
+        const year = now.getFullYear();
 
-                filtered = allPayouts.filter(p => {
-                    const d = new Date(p.timestamp);
-                    return d.getMonth() === month && d.getFullYear() === year;
-                });
-            }
+        filtered = allPayouts.filter(p => {
+            const d = new Date(p.timestamp);
+            return d.getMonth() === month && d.getFullYear() === year;
+        });
+    }
 
-            renderPayouts(filtered);
-        }
+    renderPayouts(filtered);
+}
 
-        function renderPayouts(list) {
-            const t = text[lang];
+function renderPayouts(list) {
+    const t = text[lang];
 
-            if (!list || list.length === 0) {
-                document.getElementById("payoutsBody").innerHTML =
-                    `<tr><td colspan="4">${t.noPayouts}</td></tr>`;
-                return;
-            }
+    if (!list || list.length === 0) {
+        document.getElementById("payoutsBody").innerHTML =
+            `<tr><td colspan="4">${t.noPayouts}</td></tr>`;
+        return;
+    }
 
-            let totalGross = 0;
-            let totalNet = 0;
-            let totalStripe = 0;
-            let totalPlatform = 0;
+    // Detect currency from first payout
+    const isUSD = list[0].payout_currency === "USD";
+    const currency = isUSD ? "USD" : "DOP";
 
-            list.forEach(p => {
-                totalGross += p.totalGross || 0;
-                totalNet += p.totalNet || 0;
-                totalStripe += p.totalStripeFees || 0;
-                totalPlatform += p.totalPlatformFees || 0;
-            });
+    let totalGross = 0;
+    let totalNet = 0;
+    let totalStripe = 0;
+    let totalPlatform = 0;
 
-            let html = `
-                <tr style="background:#fafafa; font-weight:bold;">
-                    <td colspan="4">
-                        <div>💰 ${t.gross}: RD$ ${totalGross.toFixed(2)}</div>
-                        <div>💳 Stripe Fees: RD$ ${totalStripe.toFixed(2)}</div>
-                        <div>🏷️ ${t.fees}: RD$ ${totalPlatform.toFixed(2)}</div>
-                        <div>🟢 ${t.net}: RD$ ${totalNet.toFixed(2)}</div>
-                    </td>
-                </tr>
-            `;
+    list.forEach(p => {
+        totalGross += p.totalGross || 0;
+        totalNet += p.totalNet || 0;
+        totalStripe += p.totalStripeFees || 0;
+        totalPlatform += p.totalPlatformFees || 0;
+    });
 
-            list.forEach(p => {
-                const date = new Date(p.timestamp).toLocaleString();
+    let html = `
+        <tr style="background:#fafafa; font-weight:bold;">
+            <td colspan="4">
+                <div>💰 ${t.gross}: ${currency} ${totalGross.toFixed(2)}</div>
+                <div>💳 Stripe Fees: ${currency} ${totalStripe.toFixed(2)}</div>
+                <div>🏷️ ${t.fees}: ${currency} ${totalPlatform.toFixed(2)}</div>
+                <div>🟢 ${t.net}: ${currency} ${totalNet.toFixed(2)}</div>
+            </td>
+        </tr>
+    `;
 
-                html += `
-                    <tr onclick="togglePayoutDetails('${p.id}')" style="cursor:pointer;">
-                        <td>${p.id}</td>
-                        <td>${p.totalNet.toFixed(2)} DOP</td>
-                        <td>${date}</td>
-                        <td>${t.completed}</td>
-                    </tr>
+    list.forEach(p => {
+        const date = new Date(p.timestamp).toLocaleString();
 
-                    <tr id="details-${p.id}" style="display:none; background:#f9f9f9;">
-                        <td colspan="4">
-                            <strong>Included Invoices:</strong><br>
-                            ${p.includedInvoices.map(i => `🧾 ${i}`).join("<br>")}
-                            <br><br>
-                            <strong>${t.gross}:</strong> RD$ ${p.totalGross.toFixed(2)}<br>
-                            <strong>Stripe Fees:</strong> RD$ ${p.totalStripeFees.toFixed(2)}<br>
-                            <strong>${t.fees}:</strong> RD$ ${p.totalPlatformFees.toFixed(2)}<br>
-                            <strong>${t.net}:</strong> RD$ ${p.totalNet.toFixed(2)}
-                        </td>
-                    </tr>
-                `;
-            });
+        html += `
+            <tr onclick="togglePayoutDetails('${p.id}')" style="cursor:pointer;">
+                <td>${p.id}</td>
+                <td>${p.totalNet.toFixed(2)} ${currency}</td>
+                <td>${date}</td>
+                <td>${t.completed}</td>
+            </tr>
 
-            document.getElementById("payoutsBody").innerHTML = html;
-        }
+            <tr id="details-${p.id}" style="display:none; background:#f9f9f9;">
+                <td colspan="4">
+                    <strong>Included Invoices:</strong><br>
+                    ${p.includedInvoices.map(i => `🧾 ${i}`).join("<br>")}
+                    <br><br>
+                    <strong>${t.gross}:</strong> ${currency} ${p.totalGross.toFixed(2)}<br>
+                    <strong>Stripe Fees:</strong> ${currency} ${p.totalStripeFees.toFixed(2)}<br>
+                    <strong>${t.fees}:</strong> ${currency} ${p.totalPlatformFees.toFixed(2)}<br>
+                    <strong>${t.net}:</strong> ${currency} ${p.totalNet.toFixed(2)}
+                </td>
+            </tr>
+        `;
+    });
 
-        function togglePayoutDetails(id) {
-            const row = document.getElementById(`details-${id}`);
-            if (!row) return;
-            row.style.display = row.style.display === "none" ? "table-row" : "none";
-        }
+    document.getElementById("payoutsBody").innerHTML = html;
+}
+
+function togglePayoutDetails(id) {
+    const row = document.getElementById(`details-${id}`);
+    if (!row) return;
+    row.style.display = row.style.display === "none" ? "table-row" : "none";
+}
+
     </script>
 </body>
 </html>
