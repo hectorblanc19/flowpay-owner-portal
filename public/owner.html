@@ -424,30 +424,25 @@ window.addEventListener("DOMContentLoaded", async () => {
         businessInput.value = businessKeyLS;
     }
 
-    // Master PIN mode (load ALL KV businesses)
+    // MASTER PIN MODE
     if (savedPIN === MASTER_PIN) {
         dropdown.style.display = "inline-block";
 
         try {
-            const res = await fetch("https://stripe-whatsapp-webhook-fixed-new.vercel.app/api/owner/businesses?pin=1234");
-            const businesses = await res.json();
+            const res = await fetch(
+                `${API_BASE}?action=listBusinesses&pin=${MASTER_PIN}`
+            );
+
+            const data = await res.json();
 
             dropdown.innerHTML = `<option value="">-- select business --</option>`;
 
-            businesses.forEach(b => {
-                dropdown.innerHTML += `<option value="${b.key}">${b.key}</option>`;
-            });
-
-            dropdown.addEventListener("change", () => {
-                if (dropdown.value) {
-                    businessInput.value = dropdown.value;
-                    loadPayments();
-                    loadPayoutHistory();
-                }
+            (data.businesses || []).forEach(key => {
+                dropdown.innerHTML += `<option value="${key}">${key}</option>`;
             });
 
         } catch (err) {
-            console.error("Error loading KV businesses", err);
+            console.error("Error loading KV ", err);
         }
     }
 
@@ -457,7 +452,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         loadPayoutHistory();
     }
 });
-
         /* =========================
            LOGOUT
         ========================= */
