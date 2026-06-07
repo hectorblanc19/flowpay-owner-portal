@@ -461,88 +461,87 @@ window.addEventListener("DOMContentLoaded", async () => {
             window.location.href = "login.html";
         }
 
-        /* =========================
-           LOAD PAYMENTS
-        ========================= */
+       /* =========================
+   LOAD PAYMENTS
+========================= */
 
-        async function loadPayments(silent = false) {
-            const businessKey = document.getElementById("businessKey").value.trim();
-            if (!businessKey) {
-                alert(text[lang].enterBusinessKey);
-                return;
-            }
+async function loadPayments(silent = false) {
+    const businessKey = document.getElementById("businessKey").value.trim();
+    if (!businessKey) {
+        alert(text[lang].enterBusinessKey);
+        return;
+    }
 
-            if (!silent) {
-                document.getElementById("paymentsBody").innerHTML =
-                    `<tr><td colspan="6">${text[lang].noData}</td></tr>`;
-            }
+    if (!silent) {
+        document.getElementById("paymentsBody").innerHTML =
+            `<tr><td colspan="6">${text[lang].noData}</td></tr>`;
+    }
 
-            try {
-                const res = await fetch(
-                    `${API_BASE}?action=payments&businessKey=${encodeURIComponent(
-                        businessKey
-                    )}&pin=${encodeURIComponent(token)}&phone=${encodeURIComponent(ownerPhone)}`
-                );
+    try {
+        const res = await fetch(
+            `${API_BASE}?action=payments&businessKey=${encodeURIComponent(
+                businessKey
+            )}&pin=${encodeURIComponent(savedPIN)}&phone=${encodeURIComponent(ownerPhone)}`
+        );
 
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Unauthorized");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unauthorized");
 
-                allPayments = data.payments || [];
-                applyPaymentFilter();
+        allPayments = data.payments || [];
+        applyPaymentFilter();
 
-            } catch (err) {
-                console.error(err);
-                document.getElementById("paymentsBody").innerHTML =
-                    `<tr><td colspan="6">Error loading payments</td></tr>`;
-                updatePaymentTotals([]);
-            }
-        }
+    } catch (err) {
+        console.error(err);
+        document.getElementById("paymentsBody").innerHTML =
+            `<tr><td colspan="6">Error loading payments</td></tr>`;
+        updatePaymentTotals([]);
+    }
+}
 
-        /* AUTO REFRESH — only when filter = today AND no search */
-        setInterval(async () => {
-            const businessKey = document.getElementById("businessKey").value.trim();
-            const searchValue = document.getElementById("searchInput").value.trim();
+/* AUTO REFRESH — only when filter = today AND no search */
+setInterval(async () => {
+    const businessKey = document.getElementById("businessKey").value.trim();
+    const searchValue = document.getElementById("searchInput").value.trim();
 
-            if (businessKey && paymentFilter === "today" && searchValue === "") {
-                await loadPayments(true);
-            }
-        }, 5000);
+    if (businessKey && paymentFilter === "today" && searchValue === "") {
+        await loadPayments(true);
+    }
+}, 5000);
 
-        /* =========================
-           PAYOUT HISTORY
-        ========================= */
 
-        async function loadPayoutHistory() {
-            const businessKey = document.getElementById("businessKey").value.trim();
-            if (!businessKey) {
-                alert(text[lang].enterBusinessKey);
-                return;
-            }
+/* =========================
+   PAYOUT HISTORY
+========================= */
 
-            document.getElementById("payoutsBody").innerHTML =
-                `<tr><td colspan="4">Loading...</td></tr>`;
+async function loadPayoutHistory() {
+    const businessKey = document.getElementById("businessKey").value.trim();
+    if (!businessKey) {
+        alert(text[lang].enterBusinessKey);
+        return;
+    }
 
-            try {
-                const res = await fetch(
-                    `${API_BASE}?action=payouts&businessKey=${encodeURIComponent(
-                        businessKey
-                    )}&pin=${encodeURIComponent(token)}&phone=${encodeURIComponent(ownerPhone)}`
-                );
+    document.getElementById("payoutsBody").innerHTML =
+        `<tr><td colspan="4">Loading...</td></tr>`;
 
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Unauthorized");
+    try {
+        const res = await fetch(
+            `${API_BASE}?action=payouts&businessKey=${encodeURIComponent(
+                businessKey
+            )}&pin=${encodeURIComponent(savedPIN)}&phone=${encodeURIComponent(ownerPhone)}`
+        );
 
-                allPayouts = data.payouts || [];
-                renderPayouts(allPayouts);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unauthorized");
 
-            } catch (err) {
-                console.error(err);
-                document.getElementById("payoutsBody").innerHTML =
-                    `<tr><td colspan="4">Error loading payouts</td></tr>`;
-            }
-        }
+        allPayouts = data.payouts || [];
+        renderPayouts(allPayouts);
 
-        /* =========================
+    } catch (err) {
+        console.error(err);
+        document.getElementById("payoutsBody").innerHTML =
+            `<tr><td colspan="4">Error loading payouts</td></tr>`;
+    }
+}        /* =========================
    PAYMENT FILTERS / SEARCH
 ========================= */
 
